@@ -3,6 +3,7 @@
 
 void LuminousEffectivity()
 {
+	Scene::SetBackground(Palette::White);
 	Scene::Resize({ 1600,900 });
 
 	CSV csvData{ U"example/csv/logCIE2008v2q_5.csv" };
@@ -160,14 +161,14 @@ void LuminousEffectivity()
 				end.x = Math::Lerp(sceneMin.x, sceneMax.x, end.x);
 				end.y = Math::Lerp(sceneMin.y, sceneMax.y, end.y);
 
-				Line{ start, end }.draw(Palette::White);
+				Line{ start, end }.draw(Palette::Black);
 			}
 		};
 
 	while (System::Update())
 	{
-		DrawValues(wavelengthes, values, Palette::White);
-		DrawColorBar();
 		DrawAxis();
+		DrawValues(wavelengthes, values, Palette::Black);
+		DrawColorBar();
 	}
 }

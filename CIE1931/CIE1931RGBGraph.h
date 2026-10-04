@@ -3,6 +3,7 @@
 
 void CIE1931RGBGraph()
 {
+	Scene::SetBackground(Palette::White);
 	Window::Resize({ 1600,900 });
 
 	CSV csvData{ U"example/csv/ciexyz31.csv" };
@@ -182,18 +183,18 @@ void CIE1931RGBGraph()
 				end.x = Math::Lerp(sceneMin.x, sceneMax.x, end.x);
 				end.y = Math::Lerp(sceneMin.y, sceneMax.y, end.y);
 
-				Line{ start, end }.draw(Palette::White);
+				Line{ start, end }.draw(Palette::Black);
 			}
 		};
 
 	bool isIntensity = false;
 	while (System::Update())
 	{
+		DrawAxis();
 		DrawValues(wavelengthes, color_R, Palette::Red);
 		DrawValues(wavelengthes, color_G, Palette::Green, isIntensity ? 4.5907 : 1.0);
 		DrawValues(wavelengthes, color_B, Palette::Blue, isIntensity ? 0.0601 : 1.0);
 		DrawColorBar();
-		DrawAxis();
 
 		if (KeySpace.down())
 		{

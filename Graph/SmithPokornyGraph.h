@@ -4,6 +4,7 @@
 void SmithPokornyGraph()
 {
 	Window::Resize({ 1600,900 });
+	Scene::SetBackground(Palette::White);
 
 	CSV csvData{ U"example/csv/sp.csv" };
 	if (!csvData) { throw Error(U"Failed to load csv."); }
@@ -174,16 +175,16 @@ void SmithPokornyGraph()
 				end.x = Math::Lerp(sceneMin.x, sceneMax.x, end.x);
 				end.y = Math::Lerp(sceneMin.y, sceneMax.y, end.y);
 
-				Line{ start, end }.draw(Palette::White);
+				Line{ start, end }.draw(Palette::Black);
 			}
 		};
 
 	while (System::Update())
 	{
+		DrawAxis();
 		DrawValues(wavelengthes, coneSpectralSensitivites_L, Palette::Red);
 		DrawValues(wavelengthes, coneSpectralSensitivites_M, Palette::Green);
 		DrawValues(wavelengthes, coneSpectralSensitivites_S, Palette::Blue);
 		DrawColorBar();
-		DrawAxis();
 	}
 }
