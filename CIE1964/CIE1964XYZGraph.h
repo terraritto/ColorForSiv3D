@@ -1,0 +1,208 @@
+﻿#pragma once
+#include <Siv3D.hpp>
+
+void CIE1964XYZGraph()
+{
+	Window::Resize({ 1600,900 });
+	Scene::SetBackground(Palette::White);
+
+	auto LoadCIEData = [](const String& path, int rows, Array<double>* wave, Array<double>& X, Array<double>& Y, Array<double>& Z)
+		{
+			CSV csvData{ path };
+			if (!csvData) { throw Error(U"Failed to load csv."); }
+
+			while (true)
+			{
+				const double waveLength = Parse<double>(csvData[rows][0]);
+				if (800 < waveLength) { break; }
+
+				// データの抽出
+				if (wave) { wave->push_back(waveLength); }
+				Float3 entry{ Parse<double>(csvData[rows][1]),Parse<double>(csvData[rows][2]), Parse<double>(csvData[rows][3]) };
+
+				// XYZなので、そのまま突っ込む
+				X.push_back(entry.x);
+				Y.push_back(entry.y);
+				Z.push_back(entry.z);
+
+				rows++;
+			}
+		};
+
+	// 波長
+	Array<double> wavelengthes;
+
+	// CIE1931 XYZ 2Deg
+	Array<double> CIE1931_X;
+	Array<double> CIE1931_Y;
+	Array<double> CIE1931_Z;
+	// ここはrowsは2行コメントを飛ばす必要有
+	LoadCIEData(U"example/csv/ciexyz31.csv", 2, nullptr, CIE1931_X, CIE1931_Y, CIE1931_Z);
+
+	// CIE1964 XYZ 10Deg
+	Array<double> CIE1964_X;
+	Array<double> CIE1964_Y;
+	Array<double> CIE1964_Z;
+	// ここはrowsが0から読みこむ必要有
+	LoadCIEData(U"example/csv/ciexyz64.csv", 0, &wavelengthes, CIE1964_X, CIE1964_Y, CIE1964_Z);
+
+	constexpr int offset = 15;
+
+	auto sceneSize = Scene::Size();
+	Vec2 sceneMin = Vec2{ offset,offset };
+	Vec2 sceneMax = sceneSize - Vec2{ offset,offset };
+
+	auto DrawValues = [&](const Array<double>& waves, const Array<double>& values, const ColorF color, bool isDot)
+		{
+			auto minWave = 350.0;
+			auto maxWave = 850.0;
+
+			auto minValue = 0.0;
+			auto maxValue = 2.0;
+
+			for (int i = 0; i < waves.size() - 1; i++)
+			{
+				Vec2 start{ (waves[i] - minWave) / (maxWave - minWave), 1.0 - (values[i] - minValue) / (maxValue - minValue) };
+				start.x = Math::Lerp(sceneMin.x, sceneMax.x, start.x);
+				start.y = Math::Lerp(sceneMin.y, sceneMax.y, start.y);
+				Vec2 end{ (waves[i + 1] - minWave) / (maxWave - minWave), 1.0 - (values[i + 1] - minValue) / (maxValue - minValue) };
+				end.x = Math::Lerp(sceneMin.x, sceneMax.x, end.x);
+				end.y = Math::Lerp(sceneMin.y, sceneMax.y, end.y);
+
+				if (isDot)
+				{
+					Line{ start, end }.draw(LineStyle::RoundDot, 5, color);
+				}
+				else
+				{
+					Line{ start, end }.draw(color);
+				}
+			}
+		};
+
+	auto DrawColorBar = [&]()
+		{
+			auto minWave = 350.0;
+			auto maxWave = 850.0;
+
+			auto GetThreshold = [&](int index, double current)
+				{
+					double minValue = wavelengthes[index - 1];
+					double maxValue = wavelengthes[index];
+					return Math::Saturate((current - minValue) / (maxValue - minValue));
+				};
+
+			auto GetColor = [](const Array<double>& values, int index, double threshold)
+				{
+					double minValue = values[index - 1];
+					double maxValue = values[index];
+					return 1.0 - Math::Lerp(minValue, maxValue, threshold);
+				};
+
+			auto BrutonWaveLengthColor = [](const double waveLength)
+				{
+					ColorF color = Palette::Black;
+
+					if (380.0 <= waveLength && waveLength < 440.0)
+					{
+						color.r = -(waveLength - 440.0) / (440.0 - 380.0);
+						color.b = 1.0;
+					}
+					else if (440.0 <= waveLength && waveLength < 490.0)
+					{
+						color.g = (waveLength - 440.0) / (490.0 - 440.0);
+						color.b = 1.0;
+					}
+					else if (490.0 <= waveLength && waveLength < 510.0)
+					{
+						color.g = 1.0;
+						color.b = -(waveLength - 510.0) / (510.0 - 490.0);
+					}
+					else if (510.0 <= waveLength && waveLength < 580)
+					{
+						color.r = (waveLength - 510.0) / (580.0 - 510.0);
+						color.g = 1.0;
+					}
+					else if (580.0 <= waveLength && waveLength < 645.0)
+					{
+						color.r = 1.0;
+						color.g = -(waveLength - 645.0) / (645.0 - 580.0);
+					}
+					else if (645.0 <= waveLength && waveLength <= 780.0)
+					{
+						color.r = 1.0;
+					}
+
+					// スペクトルの端ではフェードするように
+					double factor = 0.0;
+					if (380.0 <= waveLength && waveLength < 420.0)
+					{
+						// 左端
+						factor = 0.3 + 0.7 * (waveLength - 380.0) / (420.0 - 380.0);
+					}
+					else if (420.0 <= waveLength && waveLength < 701)
+					{
+						// 中間
+						factor = 1.0;
+					}
+					else if (701.0 <= waveLength && waveLength <= 780.0)
+					{
+						factor = 0.3 + 0.7 * (780.0 - waveLength) / (780.0 - 701.0);
+					}
+
+					return color * factor;
+				};
+
+			for (double i = minWave; i < maxWave; i += 1.0)
+			{
+				Vec2 start{ (i - minWave) / (maxWave - minWave), sceneMax.y };
+				start.x = Math::Lerp(sceneMin.x, sceneMax.x, start.x);
+
+				double next = (i + 10.0 - minWave) / (maxWave - minWave);
+				next = Math::Lerp(sceneMin.x, sceneMax.x, next);
+
+				RectF{ start.x, start.y, next - start.x, offset }.draw(BrutonWaveLengthColor(i));
+			}
+		};
+
+	auto DrawAxis = [&]()
+		{
+			auto minWave = 350.0;
+			auto maxWave = 850.0;
+
+			auto minValue = 0.0;
+			auto maxValue = 2.0;
+
+			double threshold = 1.0 - (0.0 - minValue) / (maxValue - minValue);
+
+			double lineStandard = 0.01;
+
+			for (int i = minWave; i <= maxWave; i += 1)
+			{
+				Vec2 start{ (i - minWave) / (maxWave - minWave), threshold };
+				start.x = Math::Lerp(sceneMin.x, sceneMax.x, start.x);
+				start.y = Math::Lerp(sceneMin.y, sceneMax.y, start.y);
+				Vec2 end{ (i - minWave) / (maxWave - minWave), (i - 50) % 100 == 0 ? threshold - lineStandard * 5 : threshold - lineStandard };
+				end.x = Math::Lerp(sceneMin.x, sceneMax.x, end.x);
+				end.y = Math::Lerp(sceneMin.y, sceneMax.y, end.y);
+
+				Line{ start, end }.draw(Palette::Black);
+			}
+		};
+
+	while (System::Update())
+	{
+		DrawColorBar();
+		DrawAxis();
+
+		// CIE1931
+		DrawValues(wavelengthes, CIE1931_X, Palette::Red, true);
+		DrawValues(wavelengthes, CIE1931_Y, Palette::Green, true);
+		DrawValues(wavelengthes, CIE1931_Z, Palette::Blue, true);
+
+		// CIE1964
+		DrawValues(wavelengthes, CIE1964_X, Palette::Red, false);
+		DrawValues(wavelengthes, CIE1964_Y, Palette::Green, false);
+		DrawValues(wavelengthes, CIE1964_Z, Palette::Blue, false);
+	}
+}
